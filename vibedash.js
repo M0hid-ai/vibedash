@@ -364,6 +364,17 @@ async function ghFetch(forceUser) {
       publicRepos: udata.public_repos ?? null,
       createdAt: udata.created_at ? new Date(udata.created_at) : null,
     };
+    // recent repos by name
+    gh.repoNames = [];
+    try {
+      const rReq = await fetch(`https://api.github.com/users/${encodeURIComponent(gh.data.login)}/repos?sort=updated&per_page=6`, { headers: H });
+      if (rReq.ok) {
+        gh.repoNames = (await rReq.json())
+          .map((r) => r.name)
+          .filter(Boolean)
+          .slice(0, 5);
+      }
+    } catch { }
     // 13 weeks of daily counts
     const today = new Date(); today.setUTCHours(0, 0, 0, 0);
     const buckets = [];
@@ -429,7 +440,7 @@ function render() {
   {
     const px = 3, py = innerY + 1, pw = leftW - 4;
     const rows = state.repos;
-    const perPage = Math.max(1, innerH - 6);
+    const perPage = Math.max(1, Math.floor((innerH - 4) / 2));
     const pages = Math.max(1, Math.ceil(rows.length / perPage));
     state.page = clamp(state.page, 0, pages - 1);
     const slice = rows.slice(state.page * perPage, (state.page + 1) * perPage);
@@ -442,14 +453,13 @@ function render() {
       // header
       put(px, py, `${pad('NAME', 16)}${pad('BRANCH', 11)}${padL('±CHG', 5)}  ${padL('AGE', 4)}  ${pad('COMMITS·90D', 6)}`, 'DIM');
       slice.forEach((r, i) => {
-        const y = py + 1 + i;
+        const y = py + 1 + i * 2;
         const chg = r.dirty < 0 ? S.DIMX + '?'.padStart(5) : r.dirty === 0 ? S.GREEN + '✓'.padStart(5) : S.AMBER + String(r.dirty).padStart(5);
         const name = r.name.length > 16 ? r.name.slice(0, 15) + '…' : r.name.padEnd(16);
         const br = r.branch.length > 10 ? r.branch.slice(0, 9) + '…' : r.branch.padEnd(10);
         put(px, y, `${S.BOLD}${S.FG}${name}${S.RESET}  ${S.ACCENT}${br}${S.RESET}  ${chg}${S.RESET}  ${S.DIM}${padL(reltime((Date.now() / 1000 - r.lastAt) / 1000), 4)}${S.RESET}  ${S.PINK}${String(r.commits90).padStart(6)}${S.RESET}`, 'FLOW');
         // subject line, dim
         put(px, y + 1, '     ' + fit('└ ' + r.subject, pw - 5), 'DIM');
-        i++;
       });
     }
     // footer: pager + 12-week sparkline
@@ -511,7 +521,11 @@ function render() {
         }
         put(px + 5 + 13 + 1, by, `${S.GREEN}${gh.total}${S.RESET}${S.DIM} events${S.RESET}`, 'FLOW');
         put(px, by + 1, `${S.DIM}streak  now ${S.GREEN}${gh.curStreak}${S.RESET}  best ${S.PURPLE}${gh.bestStreak}${S.RESET}  active ${gh.activeDays}d${S.RESET}`, 'FLOW');
-        if (gh.fetchedAt) put(px, by + 3, `${S.DIMX}updated ${new Date(gh.fetchedAt).toLocaleTimeString()} · press g to refetch${S.RESET}`, 'FLOW');
+        if ((gh.repoNames || []).length) {
+          const names = gh.repoNames.join(' · ');
+          put(px, by + 2, `${S.DIM}repos  ${S.CYAN}${fit(names, pw - 7)}${S.RESET}`, 'FLOW');
+        }
+        if (gh.fetchedAt) put(px, by + 4, `${S.DIMX}updated ${new Date(gh.fetchedAt).toLocaleTimeString()} · press g to refetch${S.RESET}`, 'FLOW');
       } else {
         put(px, py, `${S.BOLD}${d.login}${S.RESET}  ${S.DIM}(no recent events)${S.RESET}`, 'FLOW');
       }
