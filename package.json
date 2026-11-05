@@ -1,0 +1,14 @@
+{
+  "name": "vibedash",
+  "version": "1.0.0",
+  "description": "⌁ A zero-dependency, single-file terminal dashboard: live CPU/RAM gauges, local git repo telescope, commit sparklines, and GitHub activity. Hacker movie, but real data.",
+  "main": "vibedash.js",
+  "bin": { "vibedash": "vibedash.js" },
+  "scripts": {
+    "start": "node vibedash.js",
+    "preview": "node vibedash.js --once"
+  },
+  "keywords": ["terminal", "dashboard", "tui", "git", "github", "ansi", "nodejs"],
+  "license": "MIT",
+  "engines": { "node": ">=16" }
+}
