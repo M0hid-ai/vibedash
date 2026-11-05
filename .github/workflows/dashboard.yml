@@ -1,0 +1,61 @@
+name: ⌁ Live Dashboard
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'   # every 30 minutes
+  workflow_dispatch:          # the "run now" button
+  push:
+    branches: [main]
+    # do not loop on our own auto-commits
+    paths-ignore:
+      - 'DASHBOARD.md'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: vibedash-dashboard
+  cancel-in-progress: true
+
+jobs:
+  render:
+    # skip push events that were authored by the bot itself (belt + braces)
+    if: github.event_name != 'push' || github.event.head_commit.author.name != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Render dashboard
+        run: node vibedash.js . --user "${{ github.repository_owner }}" --once | tee /tmp/frame.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Stamp + publish DASHBOARD.md
+        run: |
+          {
+            echo "<!-- vibedash auto-generated; do not edit -->"
+            echo "# ⌁ VIBEDASH — live snapshot"
+            echo
+            echo "Auto-rendered by the **Live Dashboard** workflow every 30 minutes."
+            echo "Last run: \`${{ github.event_name }}\` at \`$(date -u '+%Y-%m-%d %H:%M UTC')\` on \`${{ github.run_id }}\`."
+            echo
+            echo '```'
+            cat /tmp/frame.txt
+            echo '```'
+          } > DASHBOARD.md
+
+      - name: Commit and push
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add DASHBOARD.md
+          if git diff --cached --quiet; then
+            echo "no changes to dashboard — skipping commit"
+          else
+            git commit -m "⌁ dashboard snapshot @ $(date -u '+%Y-%m-%d %H:%M')"
+            git push
+          fi

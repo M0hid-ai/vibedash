@@ -340,6 +340,7 @@ async function ghFetch(forceUser) {
   gh.loading = true; gh.err = null;
   try {
     const H = { 'User-Agent': 'vibedash', Accept: 'application/vnd.github+json' };
+    if (process.env.GITHUB_TOKEN) H.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
     const uReq = fetch(`https://api.github.com/users/${encodeURIComponent(user)}`, { headers: H });
     const days = new Map(); // 'YYYY-MM-DD' -> count
     const pages = [1, 2, 3].map((p) =>
@@ -594,7 +595,20 @@ function main() {
       if (state.gh.user) await ghFetch();
       term.w = clamp(process.stdout.columns || 120, 80, 200);
       term.h = clamp(process.stdout.rows || 38, 24, 60);
-      console.log(render());
+      let frame = render();
+      if (!process.stdout.isTTY) {
+        // piped/CI mode: plain text, trimmed — perfect for capture
+        frame = frame
+          .replace(/\x1b\[[0-9;]*m/g, '')
+          .split('\n')
+          .map((l) => l.replace(/\s+$/, ''))
+          .join('\n')
+          .replace(/\n+$/, '');
+        console.log(`⌁ VIBEDASH snapshot — ${new Date().toISOString()}\n`);
+        console.log(frame);
+      } else {
+        console.log(frame);
+      }
       // exit naturally: let stdout drain instead of hard-setExit (Windows aborts otherwise)
       process.exitCode = 0;
     })();
